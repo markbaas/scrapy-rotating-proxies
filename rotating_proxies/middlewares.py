@@ -12,7 +12,7 @@ from scrapy.utils.url import add_http_if_no_scheme
 from twisted.internet import task
 
 from .expire import Proxies, exp_backoff_full_jitter
-
+from .proxybroker import ProxyBroker
 
 logger = logging.getLogger(__name__)
 
@@ -77,14 +77,7 @@ class RotatingProxyMiddleware(object):
     @classmethod
     def from_crawler(cls, crawler):
         s = crawler.settings
-        proxy_path = s.get('ROTATING_PROXY_LIST_PATH', None)
-        if proxy_path is not None:
-            with codecs.open(proxy_path, 'r', encoding='utf8') as f:
-                proxy_list = [line.strip() for line in f if line.strip()]
-        else:
-            proxy_list = s.getlist('ROTATING_PROXY_LIST')
-        if not proxy_list:
-            raise NotConfigured()
+        proxy_list = ProxyBroker().proxies
         mw = cls(
             proxy_list=proxy_list,
             logstats_interval=s.getfloat('ROTATING_PROXY_LOGSTATS_INTERVAL', 30),
@@ -213,19 +206,19 @@ class BanDetectionMiddleware(object):
 
     By default, client is considered banned if a request failed, and alive
     if a response was received. You can override ban detection method by
-    passing a path to a custom BanDectionPolicy in 
+    passing a path to a custom BanDectionPolicy in
     ``ROTATING_PROXY_BAN_POLICY``, e.g.::
-      
+
     ROTATING_PROXY_BAN_POLICY = 'myproject.policy.MyBanPolicy'
-    
-    The policy must be a class with ``response_is_ban``  
-    and ``exception_is_ban`` methods. These methods can return True 
+
+    The policy must be a class with ``response_is_ban``
+    and ``exception_is_ban`` methods. These methods can return True
     (ban detected), False (not a ban) or None (unknown). It can be convenient
     to subclass and modify default BanDetectionPolicy::
-        
+
         # myproject/policy.py
         from rotating_proxies.policy import BanDetectionPolicy
-        
+
         class MyPolicy(BanDetectionPolicy):
             def response_is_ban(self, request, response):
                 # use default rules, but also consider HTTP 200 responses
@@ -233,12 +226,12 @@ class BanDetectionMiddleware(object):
                 ban = super(MyPolicy, self).response_is_ban(request, response)
                 ban = ban or b'captcha' in response.body
                 return ban
-                
+
             def exception_is_ban(self, request, exception):
                 # override method completely: don't take exceptions in account
                 return None
-        
-    Instead of creating a policy you can also implement ``response_is_ban`` 
+
+    Instead of creating a policy you can also implement ``response_is_ban``
     and ``exception_is_ban`` methods as spider methods, for example::
 
         class MySpider(scrapy.Spider):
@@ -249,7 +242,7 @@ class BanDetectionMiddleware(object):
 
             def exception_is_ban(self, request, exception):
                 return None
-     
+
     """
     def __init__(self, stats, policy):
         self.stats = stats
