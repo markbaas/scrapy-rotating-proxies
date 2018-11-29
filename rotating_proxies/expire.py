@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import division
-import time
-import random
+
 import logging
 import math
+import random
+import time
+from threading import Thread
 
 import attr
 
+from .proxybroker import ProxyBroker
 from .utils import extract_proxy_hostport
 
 logger = logging.getLogger(__name__)
@@ -32,19 +35,40 @@ class Proxies(object):
     'reanimated'). This timeout increases exponentially after each
     unsuccessful attempt to use a proxy.
     """
-    def __init__(self, proxy_list, backoff=None):
-        self.proxies = {url: ProxyState() for url in proxy_list}
-        self.proxies_by_hostport = {
-            extract_proxy_hostport(proxy): proxy
-            for proxy in self.proxies
-        }
-        self.unchecked = set(self.proxies.keys())
+    def __init__(self, backoff=None):
+
+        self.proxies_by_hostport = {}
+        self.proxies = {}
+        self.unchecked = set()
         self.good = set()
         self.dead = set()
+
+        self.broker = ProxyBroker()
+
+        proxy_refresher = Thread(target=self.refresh_proxies)
+        proxy_refresher.start()
 
         if backoff is None:
             backoff = exp_backoff_full_jitter
         self.backoff = backoff
+
+    def refresh_proxies(self):
+        num_proxies = 0
+        while True:
+            for url in self.broker.proxies:
+                if url not in self.proxies:
+                    self.proxies[url] = ProxyState()
+
+            if num_proxies == len(self.proxies):
+                break
+            num_proxies = len(self.proxies)
+
+            self.proxies_by_hostport = {
+                extract_proxy_hostport(proxy): proxy
+                for proxy in self.proxies
+            }
+            self.unchecked = set([k for k in self.proxies.keys() if k not in self.good and k not in self.dead])
+            time.sleep(30)
 
     def get_random(self):
         """ Return a random available proxy (either good or unchecked) """

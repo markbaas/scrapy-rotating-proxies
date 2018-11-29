@@ -63,12 +63,11 @@ class RotatingProxyMiddleware(object):
     * ``ROTATING_PROXY_BACKOFF_CAP`` - backoff time cap, in seconds.
       Default is 3600 (i.e. 60 min).
     """
-    def __init__(self, proxy_list, logstats_interval, stop_if_no_proxies,
+    def __init__(self, logstats_interval, stop_if_no_proxies,
                  max_proxies_to_try, backoff_base, backoff_cap):
 
         backoff = partial(exp_backoff_full_jitter, base=backoff_base, cap=backoff_cap)
-        self.proxies = Proxies(self.cleanup_proxy_list(proxy_list),
-                               backoff=backoff)
+        self.proxies = Proxies(backoff=backoff)
         self.logstats_interval = logstats_interval
         self.reanimate_interval = 5
         self.stop_if_no_proxies = stop_if_no_proxies
@@ -77,9 +76,7 @@ class RotatingProxyMiddleware(object):
     @classmethod
     def from_crawler(cls, crawler):
         s = crawler.settings
-        proxy_list = ProxyBroker().proxies
         mw = cls(
-            proxy_list=proxy_list,
             logstats_interval=s.getfloat('ROTATING_PROXY_LOGSTATS_INTERVAL', 30),
             stop_if_no_proxies=s.getbool('ROTATING_PROXY_CLOSE_SPIDER', False),
             max_proxies_to_try=s.getint('ROTATING_PROXY_PAGE_RETRY_TIMES', 5),
