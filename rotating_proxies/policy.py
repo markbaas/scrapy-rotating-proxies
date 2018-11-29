@@ -8,6 +8,9 @@ class BanDetectionPolicy(object):
     NOT_BAN_EXCEPTIONS = (IgnoreRequest,)
 
     def response_is_ban(self, request, response):
+        # print(response.url, request.url, response.status)
+        if 'distil' in response.url:
+            return True
         if response.status not in self.NOT_BAN_STATUSES:
             return True
         if response.status == 200 and not len(response.body):
